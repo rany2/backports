@@ -36,11 +36,28 @@ jobs:
       - name: Pack backports tar
         run: tar cJf backports-${{ github.event.release.tag_name }}.tar.xz backports-${{ github.event.release.tag_name }}
 
+      - name: Create sha256sum
+        run: sha256sum backports-${{ github.event.release.tag_name }}.tar.xz > backports-${{ github.event.release.tag_name }}.tar.xz.sha256sum
+
       - name: Upload backports tar
         uses: svenstaro/upload-release-action@v1-release
         with:
-          file: backports-${{ github.event.release.tag_name }}.tar.xz
-          asset_name: backports-${{ github.event.release.tag_name }}.tar.xz
+          file: backports-${{ github.event.release.tag_name }}.tar.xz*
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event.release.tag_name }}
           overwrite: true
+          file_glob: true
+
+      - name: Modify release description
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const sha256sum = fs.readFileSync('backports-${{ github.event.release.tag_name }}.tar.xz.sha256sum', 'utf8');
+            github.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: sha256sum + '\n\n' + context.payload.release.body
+            });
