@@ -37,12 +37,6 @@ jobs:
         run: tar cJf backports-${{ github.event.release.tag_name }}.tar.xz backports-${{ github.event.release.tag_name }}
 
       - name: Upload backports tar
-        uses: actions/upload-artifact@v4
-        with:
-          name: backports-${{ github.event.release.tag_name }}.tar.xz
-          path: backports-${{ github.event.release.tag_name }}.tar.xz
-
-      - name: Upload backports tar
         uses: svenstaro/upload-release-action@v1-release
         with:
           file: backports-${{ github.event.release.tag_name }}.tar.xz
