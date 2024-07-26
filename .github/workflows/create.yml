@@ -1,7 +1,8 @@
 name: Create and test backports tar
 
 on:
-  push:
+  release:
+    types: [published]
 
 jobs:
   create_tar:
@@ -19,94 +20,33 @@ jobs:
         with:
           path: backports
 
-      - name: Checkout kernel 6.1
-        uses: actions/checkout@v4
-        with:
-          repository: gregkh/linux
-          ref: refs/heads/linux-6.1.y
-          path: linux
+      - name: Clone linux
+        shell: bash
+        run: |
+          git clone --depth 1 --branch ${{ github.event.release.tag_name }} https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git linux
 
       - name: Generate backports tar
         working-directory: backports
-        run: ./gentree.py --refresh  ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-generated
+        run: ./gentree.py --refresh ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ github.event.release.tag_name }}
 
       - name: Check for git changes
         working-directory: backports
         run: git diff
 
-      - name: Pack backports-generated.tar.gz
-        run: tar cfz backports-generated.tar.gz backports-generated
+      - name: Pack backports tar
+        run: tar cJf backports-${{ github.event.release.tag_name }}.tar.xz backports-${{ github.event.release.tag_name }}
 
-      - name: Upload backports-generated.tar.gz
+      - name: Upload backports tar
         uses: actions/upload-artifact@v4
         with:
-          name: backports-generated.tar.gz
-          path: backports-generated.tar.gz
+          name: backports-${{ github.event.release.tag_name }}.tar.xz
+          path: backports-${{ github.event.release.tag_name }}.tar.xz
 
-
-  check_build:
-    name: Test backports tar
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/hauke/backports
-
-    needs: create_tar
-    continue-on-error: true
-    strategy:
-      matrix:
-        kernel: [
-           "4.14",
-           "4.15",
-           "4.16",
-           "4.17",
-           "4.18",
-           "4.19",
-           "4.20",
-           "5.0",
-           "5.1",
-           "5.2",
-           "5.3",
-           "5.4",
-           "5.5",
-           "5.6",
-           "5.7",
-           "5.8",
-           "5.9",
-           "5.10",
-           "5.11",
-           "5.12",
-           "5.13",
-           "5.14",
-           "5.15",
-           "5.16",
-           "5.17",
-           "5.18",
-           "5.19",
-           "6.0",
-           "6.1"]
-        config: [
-           allyesconfig,
-           defconfig-wifi]
-
-    steps:
-      - name: Checkout backports
-        uses: actions/checkout@v4
+      - name: Upload backports tar
+        uses: svenstaro/upload-release-action@v1-release
         with:
-          path: backports
-
-      - name: Download backports-generated.tar.gz
-        uses: actions/download-artifact@v4
-        with:
-          name: backports-generated.tar.gz
-
-      - name: Unpack backports-generated.tar.gz
-        run: tar xf backports-generated.tar.gz
-
-      - name: Create build configuration
-        working-directory: backports-generated
-        run: make -j$(nproc) KLIB=/ksrc-backports/lib/modules/${{ matrix.kernel }}.*/build/ KLIB_BUILD=/ksrc-backports/lib/modules/${{ matrix.kernel }}.*/build/ ${{ matrix.config }}
-
-      - name: Build test
-        working-directory: backports-generated
-        run: make -j$(nproc) KLIB=/ksrc-backports/lib/modules/${{ matrix.kernel }}.*/build/ KLIB_BUILD=/ksrc-backports/lib/modules/${{ matrix.kernel }}.*/build/
-
+          file: backports-${{ github.event.release.tag_name }}.tar.xz
+          asset_name: backports-${{ github.event.release.tag_name }}.tar.xz
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.event.release.tag_name }}
+          overwrite: true
